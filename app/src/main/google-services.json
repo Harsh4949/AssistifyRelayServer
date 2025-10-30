@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "821362410589",
+    "project_id": "assistify-relay-server",
+    "storage_bucket": "assistify-relay-server.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:821362410589:android:1a09eac06df857c48db9b4",
+        "android_client_info": {
+          "package_name": "com.example.assistifyrelayapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvG3UXLQVsf1YVtoclrs5HbUZ9LRrfMRU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
