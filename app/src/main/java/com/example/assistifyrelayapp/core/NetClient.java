@@ -9,7 +9,7 @@ import com.example.assistifyrelayapp.core.jsonclass.*;
 import java.io.IOException;
 
 public class NetClient {
-    private static final String BASE_URL = "https://assistify-backend-tf6m.onrender.com/";
+    private static final String BASE_URL = "https://assistify-backend-tf6m.onrender.com";
     private static NetClient instance;
     private AssistifyApiService apiService;
 

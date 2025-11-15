@@ -7,15 +7,20 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
-
+import com.example.assistifyrelayapp.session.SessionController.SessionInfo;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SwitchCompat;
@@ -26,6 +31,10 @@ import com.example.assistifyrelayapp.R;
 import com.example.assistifyrelayapp.auth.DeviceRegistrationManager;
 import com.example.assistifyrelayapp.core.Persistence;
 import com.example.assistifyrelayapp.core.SendAndReceivePreferences; // import the preferences helper (add this class if missing)
+import com.example.assistifyrelayapp.session.SessionController;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class SetupActivity extends AppCompatActivity {
     private static final int PERMISSION_REQ_CODE = 100;
@@ -46,10 +55,15 @@ public class SetupActivity extends AppCompatActivity {
     private Button btnDeviceAdmin;
     private Button btnIgnoreBattery;
     private SwitchCompat adminPermission; // UI toggle for admin
-
+    private TextView tvDeviceId,tvSessionStatus;
+    private ListView lvSessions ;
     private Persistence storage;
     private ComponentName mComponentName;
     private DevicePolicyManager mDevicePolicyManager;
+    private ArrayAdapter<String> sessionAdapter;
+    private List<String> sessionDisplayList = new ArrayList<>();
+    private Handler handler;
+    private Runnable updateRunnable;
 
     private ComponentName adminComponent() {
         return new ComponentName(this, com.example.assistifyrelayapp.admin.MyDeviceAdminReceiver.class);
@@ -70,7 +84,22 @@ public class SetupActivity extends AppCompatActivity {
         btnRegister = findViewById(R.id.btn_register);
         btnDeviceAdmin = findViewById(R.id.btn_request_device_admin);
         btnIgnoreBattery = findViewById(R.id.btn_ignore_battery);
+        tvDeviceId = findViewById(R.id.tv_device_id);
+        lvSessions = findViewById(R.id.lv_sessions);
+        tvSessionStatus = findViewById(R.id.tv_session_status);
 
+
+        sessionAdapter = new ArrayAdapter<>(
+                this,
+                R.layout.list_item_session,   // <--- your custom layout
+                R.id.listItemText,            // <--- TextView inside custom layout
+                sessionDisplayList
+        );
+        lvSessions.setAdapter(sessionAdapter);
+
+        handler = new Handler(Looper.getMainLooper());
+        updateRunnable = this::updateStatus;
+        updateStatus();
 
         btnRequestPermissions.setOnClickListener(v -> requestRuntimePermissions());
 
@@ -158,6 +187,8 @@ public class SetupActivity extends AppCompatActivity {
                                 Toast.makeText(SetupActivity.this, "YOU DIDN'T GRANT ADMIN PERMISSION BEFORE!!", Toast.LENGTH_LONG).show();
                             }
                         }
+
+
                     }
                 } catch (Exception e) {
                     if (adminPermission.isChecked() && (mDevicePolicyManager == null || mDevicePolicyManager.getActiveAdmins() == null)) {
@@ -174,14 +205,23 @@ public class SetupActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateStatus();
+        handler.postDelayed(updateRunnable, 1000);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        handler.removeCallbacks(updateRunnable);
     }
 
     private void updateStatus() {
+        // === 1️⃣ Permissions & Admin Status ===
         boolean runtimePermissions = hasAllPermissions();
         boolean persistedPermissions = storage.isPermissionsGranted();
 
         if (runtimePermissions) {
             tvPermissionsStatus.setText("Status: All required permissions granted");
+            tvPermissionsStatus.setTextColor(Color.GREEN);
             storage.setPermissionsGranted(true);
         } else if (persistedPermissions) {
             tvPermissionsStatus.setText("Status: Permissions appear granted (persisted) — verify system settings");
@@ -193,20 +233,47 @@ public class SetupActivity extends AppCompatActivity {
         if (isAdmin) storage.setDeviceAdminEnabled(true);
 
         boolean persistedAdmin = storage.isDeviceAdminEnabled();
-        tvDeviceAdminStatus.setText(isAdmin ? "Device admin: Enabled" :
-                (persistedAdmin ? "Device admin: Enabled (persisted)" : "Device admin: Not enabled"));
+        tvDeviceAdminStatus.setTextColor(persistedAdmin ? Color.GREEN : Color.RED);
+        tvDeviceAdminStatus.setText((persistedAdmin ? "Device admin: Enabled "  : "Device admin: Not enabled"));
 
         boolean registered = storage.isRegistered();
         if (btnRegister != null) {
             if (registered) {
-                btnRegister.setText("Device registered");
+                btnRegister.setText("Device Registered...");
+                btnRegister.setTextColor(Color.GREEN);
                 btnRegister.setEnabled(false);
             } else {
                 btnRegister.setText("Register Device with Backend");
                 btnRegister.setEnabled(true);
             }
         }
+
+        // === 2️⃣ Device ID and Session Info ===
+        String deviceId = DeviceRegistrationManager.getDeviceId(this);
+        tvDeviceId.setText("Device ID: " + (deviceId != null ? deviceId : "Not registered"));
+        tvDeviceId.setTextColor(deviceId != null  ? Color.GREEN : Color.RED);
+
+        SessionController controller = SessionController.getInstance(this);
+        sessionDisplayList.clear();
+
+        if (controller.getActiveSessions().isEmpty()) {
+            tvSessionStatus.setText("Session Status: IDLE");
+            sessionDisplayList.add("No active sessions");
+        } else {
+            tvSessionStatus.setText("Session Status: ACTIVE (" + controller.getActiveSessions().size() + ")");
+            for (SessionInfo session : controller.getActiveSessions().values()) {
+                String info = "Session ID: " + session.sessionId +
+                        "\nExpires at: " + new java.util.Date(session.expiresAt).toString();
+                sessionDisplayList.add(info);
+            }
+        }
+
+        sessionAdapter.notifyDataSetChanged();
+
+        // === 3️⃣ Auto-refresh every 2 seconds ===
+        handler.postDelayed(updateRunnable, 2000);
     }
+
 
     private void requestRuntimePermissions() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {

@@ -3,80 +3,133 @@ package com.example.assistifyrelayapp.ui;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.ArrayAdapter;
-import android.widget.ListView;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.cardview.widget.CardView;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
+import com.example.assistifyrelayapp.LocalStorage.LocalTransactionStorage;
 import com.example.assistifyrelayapp.R;
-import com.example.assistifyrelayapp.auth.DeviceRegistrationManager;
+import com.example.assistifyrelayapp.core.jsonclass.TransactionData;
 import com.example.assistifyrelayapp.session.SessionController;
-import com.example.assistifyrelayapp.session.SessionController.SessionInfo;
 
-import java.util.ArrayList;
+import android.graphics.Color;
+import android.graphics.Typeface;
+import android.util.Log;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.Toast;
+
 import java.util.List;
 
 public class DashboardActivity extends AppCompatActivity {
-    private TextView tvDeviceId;
-    private ListView lvSessions;
-    private Handler handler;
-    private Runnable updateRunnable;
-    private ArrayAdapter<String> sessionAdapter;
-    private List<String> sessionDisplayList = new ArrayList<>();
+
+    static List<TransactionData> messages; // Now used for SMS message history
+    int totalSessions = 0;
+    int totalSmsSent = 0;
+
+    TextView totalTransactionsTextView, totalAmountTextView;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_dashboard);
 
-        tvDeviceId = findViewById(R.id.tv_device_id);
-        lvSessions = findViewById(R.id.lv_sessions);
+        totalTransactionsTextView = findViewById(R.id.totalTransactions);
+        totalAmountTextView = findViewById(R.id.totalAmount);
 
-        sessionAdapter = new ArrayAdapter<>(this,
-                android.R.layout.simple_list_item_1,
-                sessionDisplayList);
-        lvSessions.setAdapter(sessionAdapter);
-
-        handler = new Handler(Looper.getMainLooper());
-        updateRunnable = this::updateStatus;
-
-        updateStatus();
+        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.dashBord_layout), (v, insets) -> {
+            Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom);
+            loadMessages();
+            return insets;
+        });
     }
 
-    @Override
-    protected void onResume() {
-        super.onResume();
-        handler.postDelayed(updateRunnable, 1000);
+    private void addTransactionCard(String sessionId, String body, String receivedAt, String status) {
+        CardView cardView = new CardView(this);
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        );
+        cardParams.setMargins(0, 20, 0, 0);
+        cardView.setLayoutParams(cardParams);
+        cardView.setRadius(16f);
+        cardView.setCardElevation(8f);
+        cardView.setCardBackgroundColor(Color.parseColor("#F0FFFF"));
+
+        LinearLayout innerLayout = new LinearLayout(this);
+        innerLayout.setOrientation(LinearLayout.VERTICAL);
+        innerLayout.setPadding(32, 24, 32, 24);
+
+        TextView sessionText = new TextView(this);
+        sessionText.setText("Session #" + sessionId);
+        sessionText.setTextSize(17f);
+        sessionText.setTypeface(null, Typeface.BOLD);
+        sessionText.setTextColor(Color.BLACK);
+
+        TextView bodyText = new TextView(this);
+        bodyText.setText("SMS: " + body);
+        bodyText.setTextSize(16f);
+        bodyText.setTextColor(Color.parseColor("#2ECC71"));
+
+        TextView timeText = new TextView(this);
+        timeText.setText(receivedAt);
+        timeText.setTextSize(14f);
+        timeText.setTextColor(Color.GRAY);
+
+        TextView textStatus = new TextView(this);
+        textStatus.setText(status);
+        textStatus.setTextSize(14f);
+        if (status.equalsIgnoreCase("Sent") || status.equalsIgnoreCase("Received"))
+            textStatus.setTextColor(Color.parseColor("#2ECC71"));
+        else
+            textStatus.setTextColor(Color.RED);
+
+        innerLayout.addView(sessionText);
+        innerLayout.addView(bodyText);
+        innerLayout.addView(timeText);
+        innerLayout.addView(textStatus);
+        cardView.addView(innerLayout);
+
+        LinearLayout container = findViewById(R.id.transactionListContainer);
+        container.addView(cardView);
     }
 
-    @Override
-    protected void onPause() {
-        super.onPause();
-        handler.removeCallbacks(updateRunnable);
-    }
+    private void loadMessages() {
+        totalSessions =   SessionController.getInstance(getApplicationContext()).getActiveSessions().size();
+        totalSmsSent = 0;
 
-    private void updateStatus() {
-        String deviceId = DeviceRegistrationManager.getDeviceId(this);
-        tvDeviceId.setText("Device ID: " + (deviceId != null ? deviceId : "Not registered"));
+        messages = LocalTransactionStorage.getAllTransactions(this);
 
-        SessionController controller = SessionController.getInstance(this);
+        LinearLayout container = findViewById(R.id.transactionListContainer);
+        container.removeAllViews();
 
-        // Clear old data
-        sessionDisplayList.clear();
+        for (TransactionData msg : messages) {
+            addTransactionCard(msg.getSessionId(), msg.getBody(), msg.getReceivedAt(), msg.getStatus());
+            totalSmsSent++;
+            // Assume sessions list is unique or otherwise count as needed
 
-        if (controller.getActiveSessions().isEmpty()) {
-            sessionDisplayList.add("No active sessions");
-        } else {
-            for (SessionInfo session : controller.getActiveSessions().values()) {
-                String info = "Session ID: " + session.sessionId + "\nExpires at: " +
-                        new java.util.Date(session.expiresAt).toString();
-                sessionDisplayList.add(info);
-            }
         }
 
-        sessionAdapter.notifyDataSetChanged();
+        totalTransactionsTextView.setText(String.valueOf(totalSessions));
+        totalAmountTextView.setText(String.valueOf(totalSmsSent));
+    }
 
-        handler.postDelayed(updateRunnable, 2000); // Update every 2 seconds
+    public void onclearDataBtnClicked(View view) {
+        LocalTransactionStorage.clearAllTransactions(getApplicationContext());
+        LinearLayout container = findViewById(R.id.transactionListContainer);
+        container.removeAllViews();
+        totalSessions = 0;
+        totalSmsSent = 0;
+        totalTransactionsTextView.setText("0");
+        totalAmountTextView.setText("0");
+        Toast.makeText(DashboardActivity.this, "All SMS/session data cleared ✅", Toast.LENGTH_SHORT).show();
     }
 }
