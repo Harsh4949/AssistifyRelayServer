@@ -169,12 +169,5 @@ Make note of the server host/port (use your LAN IP if testing on a physical Andr
 ---
 
 ## License
-Specify your project license here (add LICENSE file). If none, add a LICENSE file to the repo.
 
----
-
-If you want, I can:
-- Patch `NetClient` to set your server base URL and add an OkHttp logging interceptor.
-- Add a sample `network_security_config.xml` and update `AndroidManifest.xml` for cleartext testing.
-- Generate a short debug checklist for a specific device model (e.g., Xiaomi/OnePlus).
-Which would you like next?  
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
