@@ -114,45 +114,27 @@ public class SetupActivity extends AppCompatActivity {
             updateStatus();
         });
 
-        if (btnDeviceAdmin != null) {
-            btnDeviceAdmin.setOnClickListener(new View.OnClickListener() {
-                @Override
-                public void onClick(View view) {
-                    try {
-                        boolean wantsAdmin = adminPermission != null && adminPermission.isChecked();
-                        if (wantsAdmin) {
-                            SendAndReceivePreferences.setboolean(getApplicationContext(), "adminPermission", true);
+        btnDeviceAdmin.setOnClickListener(v -> {
 
-                            Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
-                            intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, mComponentName);
-                            intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, "Some description abt admin");
+            boolean isAdmin = mDevicePolicyManager.isAdminActive(mComponentName);
 
-                            startActivityForResult(intent, ADMIN_INTENT);
-                        } else {
-                            SendAndReceivePreferences.setboolean(getApplicationContext(), "adminPermission", false);
+            if (!isAdmin) {
+                // Enable Device Admin
+                Intent intent = new Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN);
+                intent.putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, mComponentName);
+                intent.putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION,
+                        "Assistify needs Device Admin to stay active in background.");
+                startActivityForResult(intent, ADMIN_INTENT);
 
-                            try {
-                                if (mDevicePolicyManager != null) {
-                                    mDevicePolicyManager.removeActiveAdmin(mComponentName);
-                                }
-                            } catch (Exception e) {
-                                String msg = e.getMessage();
-                                if (msg != null && msg.contains("Admin ComponentInfo")) {
-                                    Toast.makeText(SetupActivity.this, "YOU DIDN'T GRANT ADMIN PERMISSION BEFORE!!", Toast.LENGTH_LONG).show();
-                                }
-                            }
-                        }
-                    } catch (Exception e) {
-                        if (adminPermission != null && adminPermission.isChecked() &&
-                                (mDevicePolicyManager == null || mDevicePolicyManager.getActiveAdmins() == null)) {
-                            Toast.makeText(SetupActivity.this, "You have not given admin permission", Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        Toast.makeText(SetupActivity.this, e.getMessage(), Toast.LENGTH_LONG).show();
-                    }
-                }
-            });
-        }
+            } else {
+                // Disable Device Admin
+                mDevicePolicyManager.removeActiveAdmin(mComponentName);
+                Toast.makeText(this, "Device Admin Disabled", Toast.LENGTH_SHORT).show();
+                updateStatus();
+            }
+        });
+
+
 
         if (btnIgnoreBattery != null) {
             btnIgnoreBattery.setOnClickListener(v -> requestIgnoreBatteryOptimizations());

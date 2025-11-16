@@ -87,7 +87,7 @@ public class SessionController {
         editor.putString(KEY_SESSIONS, json);
         editor.apply();
 
-        Log.d("SessionController", "Saved sessions: " + activeSessions.size());
+//        Log.d("SessionController", "Saved sessions: " + activeSessions.size());
     }
 
     // Load sessions map from SharedPreferences
